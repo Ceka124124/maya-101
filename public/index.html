@@ -1,0 +1,1341 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no"/>
+<meta name="apple-mobile-web-app-capable" content="yes"/>
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent"/>
+<title>🎲 Domino 101</title>
+<link href="https://fonts.googleapis.com/css2?family=Cinzel+Decorative:wght@700;900&family=Nunito:wght@400;600;700;800;900&display=swap" rel="stylesheet"/>
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css"/>
+<script src="/socket.io/socket.io.js"></script>
+<style>
+/* ═══ TOKENS ═══ */
+:root{
+  --bg:#0d0800;--felt:#183010;--gold:#d4a843;--text:#f0e8d0;--muted:#5a7050;
+  --border:rgba(212,168,67,.2);--green:#27ae60;--red:#e74c3c;
+  --safe-b:env(safe-area-inset-bottom,0px);
+  --safe-t:env(safe-area-inset-top,0px);
+}
+*,*::before,*::after{margin:0;padding:0;box-sizing:border-box;-webkit-tap-highlight-color:transparent;}
+html,body{
+  height:100%;height:100dvh;overflow:hidden;
+  background:var(--bg);
+  font-family:'Nunito',sans-serif;color:var(--text);
+  user-select:none;-webkit-user-select:none;
+  touch-action:manipulation;
+}
+
+/* ═══ LOGIN ═══ */
+#loginScreen{
+  position:fixed;inset:0;z-index:999;
+  background:radial-gradient(ellipse at 50% 30%,#193014 0%,#070e04 70%);
+  display:flex;flex-direction:column;align-items:center;justify-content:center;padding:24px;
+  padding-top:calc(24px + var(--safe-t));
+  transition:opacity .4s,transform .4s;
+}
+#loginScreen.hide{opacity:0;pointer-events:none;transform:scale(1.05);}
+.lg-logo{font-size:4.5rem;margin-bottom:10px;animation:logoPop 2s ease infinite;
+  filter:drop-shadow(0 0 20px rgba(212,168,67,.5));}
+@keyframes logoPop{0%,100%{transform:rotate(-6deg)}50%{transform:rotate(6deg) scale(1.08)}}
+.lg-title{font-family:'Cinzel Decorative',serif;font-size:clamp(1.8rem,7vw,2.8rem);
+  color:var(--gold);text-shadow:0 0 30px rgba(212,168,67,.5);margin-bottom:5px;text-align:center;}
+.lg-sub{color:var(--muted);font-size:.88rem;margin-bottom:28px;text-align:center;}
+.lg-card{background:linear-gradient(155deg,#0e1e08,#070f04);border:1px solid var(--border);
+  border-radius:20px;padding:26px 22px;width:100%;max-width:380px;
+  box-shadow:0 24px 60px rgba(0,0,0,.7);}
+.inp-g{position:relative;margin-bottom:13px;}
+.inp-g i{position:absolute;left:14px;top:50%;transform:translateY(-50%);color:var(--muted);font-size:.9rem;pointer-events:none;}
+.inp-g input{width:100%;padding:13px 13px 13px 42px;background:rgba(255,255,255,.05);
+  border:1.5px solid var(--border);border-radius:12px;color:var(--text);
+  font-family:'Nunito';font-size:1rem;font-weight:700;outline:none;transition:border-color .2s;}
+.inp-g input:focus{border-color:var(--gold);}
+.inp-g input::placeholder{color:rgba(255,255,255,.18);font-weight:400;}
+.btn-join{width:100%;padding:14px;background:linear-gradient(135deg,#d4a843,#a07828);
+  border:none;border-radius:13px;color:#06100a;font-family:'Cinzel Decorative',serif;
+  font-size:1rem;font-weight:900;letter-spacing:.04em;cursor:pointer;
+  box-shadow:0 5px 20px rgba(212,168,67,.4);transition:all .2s;margin-top:4px;}
+.btn-join:active{transform:scale(.97);}
+
+/* ═══ APP SHELL ═══ */
+#app{display:flex;flex-direction:column;height:100dvh;padding-top:var(--safe-t);}
+
+/* ── TOPBAR ── */
+#topbar{
+  flex-shrink:0;height:50px;
+  background:linear-gradient(90deg,#080500,#0e0a02,#080500);
+  border-bottom:1px solid var(--border);
+  display:flex;align-items:center;padding:0 8px;gap:5px;
+  box-shadow:0 2px 16px rgba(0,0,0,.6);z-index:20;
+}
+.tb-logo{font-family:'Cinzel Decorative',serif;color:var(--gold);font-size:.75rem;flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+.chip{padding:3px 7px;border-radius:7px;font-size:.65rem;font-weight:700;
+  display:flex;align-items:center;gap:4px;white-space:nowrap;flex-shrink:0;}
+.chip-turn{background:rgba(212,168,67,.1);border:1px solid rgba(212,168,67,.28);color:var(--gold);}
+.chip-round{background:rgba(41,128,185,.1);border:1px solid rgba(41,128,185,.28);color:#5dade2;}
+.bdot{width:6px;height:6px;border-radius:50%;background:var(--green);animation:bPulse 1.3s infinite;flex-shrink:0;}
+@keyframes bPulse{0%,100%{opacity:1;transform:scale(1)}50%{opacity:.2;transform:scale(.4)}}
+.tb-acts{display:flex;gap:4px;}
+.ib{width:32px;height:32px;border-radius:9px;border:none;cursor:pointer;
+  display:flex;align-items:center;justify-content:center;font-size:.85rem;
+  transition:all .15s;position:relative;flex-shrink:0;}
+.ib:active{transform:scale(.84);}
+.ib.green{background:rgba(39,174,96,.18);border:1px solid rgba(39,174,96,.36);color:#2ecc71;}
+.ib.blue {background:rgba(41,128,185,.18);border:1px solid rgba(41,128,185,.36);color:#5dade2;}
+.ib.gold {background:rgba(212,168,67,.12);border:1px solid rgba(212,168,67,.36);color:var(--gold);}
+.ib.pink {background:rgba(255,100,150,.1); border:1px solid rgba(255,100,150,.32);color:#ff6496;font-size:.95rem;}
+.ib.orange{background:rgba(230,126,34,.12);border:1px solid rgba(230,126,34,.36);color:#e67e22;}
+.cbadge{position:absolute;top:-3px;right:-3px;width:14px;height:14px;border-radius:50%;
+  background:var(--red);font-size:.55rem;font-weight:900;display:flex;align-items:center;justify-content:center;}
+
+/* ═══ TABLE (felt) ═══ */
+#table{
+  flex:1;position:relative;overflow:hidden;
+  background:radial-gradient(ellipse at 50% 45%,#1d4012 0%,#0e2808 55%,#060f04 100%);
+  /* CRITICAL: leaves room for hands */
+  min-height:0;
+}
+/* Felt texture */
+#table::before{content:'';position:absolute;inset:0;pointer-events:none;
+  background-image:radial-gradient(circle,rgba(0,0,0,.12) 1px,transparent 1px);
+  background-size:6px 6px;opacity:.55;z-index:0;}
+#table::after{content:'';position:absolute;inset:0;pointer-events:none;
+  background:radial-gradient(ellipse at 50% 50%,transparent 45%,rgba(0,0,0,.55) 100%);z-index:0;}
+
+/* ═══ OPPONENT ZONES ═══ */
+.opp-zone{
+  position:absolute;display:flex;align-items:center;gap:2px;
+  z-index:5;pointer-events:none;
+}
+#opp-top  {top:8px;left:50%;transform:translateX(-50%);flex-direction:row;}
+#opp-left {left:5px;top:50%;transform:translateY(-50%);flex-direction:column;}
+#opp-right{right:5px;top:50%;transform:translateY(-50%);flex-direction:column;}
+
+/* ── Opponent card backs — proper 3D domino look ── */
+.opp-card{
+  flex-shrink:0;
+  background:linear-gradient(150deg,#f5f0e0,#ddd4b0);
+  border:2px solid #2a1606;
+  border-radius:5px;
+  box-shadow:2px 3px 0 #1a0e04,0 4px 10px rgba(0,0,0,.7);
+  position:relative;overflow:hidden;
+}
+/* Divider line on back */
+.opp-card::before{
+  content:'';position:absolute;
+  background:rgba(40,20,5,.25);
+}
+/* Pattern dots */
+.opp-card::after{
+  content:'';position:absolute;inset:3px;border-radius:3px;
+  border:1px solid rgba(40,20,5,.1);
+}
+
+/* TOP opponent — vertical cards (portrait domino) */
+#opp-top .opp-card{
+  width:22px;height:38px;
+  transform:perspective(100px) rotateX(8deg);
+  margin:0 -6px;
+}
+#opp-top .opp-card::before{
+  left:4px;right:4px;top:50%;height:1.5px;transform:translateY(-50%);
+}
+/* slight fan rotation for top */
+#opp-top .opp-card:nth-child(odd){transform:perspective(100px) rotateX(8deg) rotate(-1deg);}
+#opp-top .opp-card:nth-child(even){transform:perspective(100px) rotateX(8deg) rotate(1deg);}
+
+/* LEFT/RIGHT opponents — horizontal cards (landscape domino) */
+#opp-left .opp-card,
+#opp-right .opp-card{
+  width:38px;height:22px;
+  transform:perspective(80px) rotateY(6deg);
+  margin:-6px 0;
+}
+#opp-left .opp-card{transform:perspective(80px) rotateY(6deg);}
+#opp-right .opp-card{transform:perspective(80px) rotateY(-6deg);}
+#opp-left .opp-card::before,
+#opp-right .opp-card::before{
+  top:4px;bottom:4px;left:50%;width:1.5px;transform:translateX(-50%);
+}
+/* slight fan for left/right */
+#opp-left .opp-card:nth-child(odd) {transform:perspective(80px) rotateY(6deg) rotate(-1deg);}
+#opp-left .opp-card:nth-child(even){transform:perspective(80px) rotateY(6deg) rotate(1deg);}
+#opp-right .opp-card:nth-child(odd) {transform:perspective(80px) rotateY(-6deg) rotate(-1deg);}
+#opp-right .opp-card:nth-child(even){transform:perspective(80px) rotateY(-6deg) rotate(1deg);}
+
+/* Opponent info badges */
+.opp-info{
+  position:absolute;
+  background:rgba(4,8,2,.92);border:1px solid rgba(255,255,255,.08);
+  border-radius:18px;padding:3px 8px 3px 4px;
+  display:flex;align-items:center;gap:5px;backdrop-filter:blur(6px);z-index:6;pointer-events:none;
+}
+#opp-top   .opp-info{top:calc(100% + 4px);left:50%;transform:translateX(-50%);}
+#opp-left  .opp-info{left:calc(100% + 5px);top:50%;transform:translateY(-50%);}
+#opp-right .opp-info{right:calc(100% + 5px);top:50%;transform:translateY(-50%);}
+.opp-av{width:22px;height:22px;border-radius:50%;display:flex;align-items:center;justify-content:center;
+  font-size:.56rem;font-weight:900;color:#fff;flex-shrink:0;border:2px solid rgba(255,255,255,.12);}
+.opp-av.active{border-color:#ffd600;animation:avGlow 1s infinite;}
+@keyframes avGlow{0%,100%{box-shadow:0 0 0 2px rgba(255,214,0,.3)}50%{box-shadow:0 0 0 4px rgba(255,214,0,.65)}}
+.opp-name{font-size:.62rem;font-weight:800;color:var(--text);max-width:58px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+.opp-cnt{font-size:.58rem;color:var(--gold);font-weight:900;}
+.opp-empty{display:flex;flex-direction:column;align-items:center;justify-content:center;opacity:.18;gap:3px;}
+.opp-empty i{font-size:1rem;color:var(--muted);}
+.opp-empty span{font-size:.5rem;color:var(--muted);}
+
+/* ═══ BOARD ═══ */
+#boardWrap{
+  position:absolute;
+  top:70px;left:55px;right:55px;bottom:10px;
+  overflow:auto;-webkit-overflow-scrolling:touch;scrollbar-width:none;
+  display:flex;align-items:center;justify-content:center;
+  z-index:2;
+}
+#boardWrap::-webkit-scrollbar{display:none;}
+#boardInner{
+  display:flex;align-items:center;flex-wrap:nowrap;
+  padding:12px 10px;gap:0;min-width:max-content;
+  position:relative;
+}
+#emptyBoard{
+  width:100%;text-align:center;color:rgba(80,120,60,.4);
+  font-size:.75rem;letter-spacing:.1em;text-transform:uppercase;pointer-events:none;
+  display:flex;flex-direction:column;align-items:center;gap:8px;
+}
+#emptyBoard i{font-size:2rem;color:rgba(80,120,60,.3);}
+
+/* ═══ 3D DOMINO TILES ═══ */
+.domino{position:relative;display:inline-flex;cursor:pointer;flex-shrink:0;}
+
+/* HAND TILES — vertical, portrait */
+.domino:not(.on-board) .tile-body{
+  display:flex;flex-direction:column;
+  width:42px;
+  background:linear-gradient(155deg,#faf6eb,#e8ddc8);
+  border:2.5px solid #1e0e04;
+  border-radius:9px;
+  box-shadow:
+    3px 5px 0 #2a1408,
+    0 8px 20px rgba(0,0,0,.85),
+    inset 0 1px 0 rgba(255,255,255,.6),
+    inset 0 -1px 0 rgba(0,0,0,.15);
+  overflow:hidden;position:relative;
+  transform:perspective(200px) rotateX(10deg) rotateY(-2deg);
+  transition:transform .2s,box-shadow .2s,filter .2s;
+}
+/* Divider on hand tiles */
+.domino:not(.on-board) .tile-body::after{
+  content:'';position:absolute;left:5px;right:5px;top:50%;height:2px;
+  background:rgba(30,14,4,.25);pointer-events:none;
+}
+
+/* BOARD TILES — horizontal  */
+.domino.on-board .tile-body{
+  display:flex;flex-direction:row;
+  height:48px;
+  background:linear-gradient(150deg,#faf6eb,#e8ddc8);
+  border:2.5px solid #1e0e04;
+  border-radius:9px;
+  box-shadow:
+    2px 4px 0 #2a1408,
+    0 6px 16px rgba(0,0,0,.8),
+    inset 0 1px 0 rgba(255,255,255,.55),
+    inset 0 -1px 0 rgba(0,0,0,.12);
+  overflow:hidden;position:relative;
+  /* 3D perspective like real domino */
+  transform:perspective(160px) rotateX(6deg);
+}
+/* Vertical divider on board tiles */
+.domino.on-board .tile-body::after{
+  content:'';position:absolute;top:5px;bottom:5px;left:50%;width:2px;
+  background:rgba(30,14,4,.25);pointer-events:none;
+}
+
+/* DOUBLE tiles on board — go vertical */
+.domino.on-board.is-double .tile-body{
+  flex-direction:column;
+  height:auto;width:48px;
+  transform:perspective(160px) rotateX(6deg) rotateY(-3deg);
+}
+.domino.on-board.is-double .tile-body::after{
+  left:5px;right:5px;top:50%;bottom:auto;width:auto;height:2px;
+  transform:translateY(-50%);
+}
+
+/* FACE */
+.face{
+  position:relative;flex-shrink:0;
+  display:flex;align-items:center;justify-content:center;
+  background:transparent;
+}
+.domino:not(.on-board) .face{width:42px;height:38px;}
+.domino.on-board:not(.is-double) .face{width:42px;height:48px;}
+.domino.on-board.is-double .face{width:48px;height:42px;}
+
+.face:last-child{border-top:1.5px solid rgba(30,14,4,.2);}
+.domino.on-board:not(.is-double) .face:last-child{border-top:none;border-left:1.5px solid rgba(30,14,4,.2);}
+
+/* DOTS — rich black, shiny */
+.dot{
+  position:absolute;
+  border-radius:50%;
+  transform:translate(-50%,-50%);
+  background:radial-gradient(circle at 35% 28%,#3a3a3a,#050505);
+  box-shadow:
+    inset 0 1px 2px rgba(0,0,0,.7),
+    0 1px 1px rgba(255,255,255,.08),
+    0 0 3px rgba(0,0,0,.4);
+}
+.domino:not(.on-board) .dot{width:6px;height:6px;}
+.domino.on-board .dot{width:7px;height:7px;}
+
+/* States */
+.domino.playable:not(.selected){animation:tileGlow 1.9s ease infinite;}
+@keyframes tileGlow{
+  0%,100%{filter:drop-shadow(0 0 6px rgba(212,168,67,.55))}
+  50%{filter:drop-shadow(0 0 18px rgba(212,168,67,1))}
+}
+.domino.selected .tile-body{
+  transform:perspective(200px) rotateX(-8deg) translateY(-28px) scale(1.25)!important;
+  filter:brightness(1.4) drop-shadow(0 0 20px rgba(212,168,67,1));
+  box-shadow:4px 14px 0 #2a1408,0 20px 40px rgba(0,0,0,.9)!important;
+  z-index:30;
+}
+.domino.unplayable{opacity:.28;cursor:not-allowed;}
+.domino.on-board{cursor:default;animation:none!important;}
+.domino.on-board:active{transform:none!important;}
+
+/* ═══ BOARD SNAKE — organic tilt ═══ */
+/* Alternating micro-rotation baked into JS, bend handled here */
+.domino.on-board.tilt-p .tile-body{transform:perspective(160px) rotateX(6deg) rotate(2deg) !important;}
+.domino.on-board.tilt-n .tile-body{transform:perspective(160px) rotateX(6deg) rotate(-2deg) !important;}
+.domino.on-board.is-double.tilt-p .tile-body{transform:perspective(160px) rotateX(6deg) rotateY(-3deg) rotate(2deg) !important;}
+.domino.on-board.is-double.tilt-n .tile-body{transform:perspective(160px) rotateX(6deg) rotateY(-3deg) rotate(-2deg) !important;}
+
+/* ═══ MY HAND STRIP ═══ */
+#handStrip{
+  flex-shrink:0;
+  background:linear-gradient(0deg,#050800,#0a0e04);
+  border-top:1px solid var(--border);
+  padding:8px 8px calc(10px + var(--safe-b));
+  display:flex;align-items:flex-start;justify-content:flex-start;gap:6px;
+  overflow-x:auto;overflow-y:visible;
+  min-height:110px;max-height:130px;
+  -webkit-overflow-scrolling:touch;scrollbar-width:none;z-index:10;
+}
+#handStrip::-webkit-scrollbar{display:none;}
+#handStrip.my-turn{box-shadow:0 -4px 26px rgba(212,168,67,.28),inset 0 0 36px rgba(212,168,67,.05);}
+#handTiles{display:flex;gap:4px;align-items:flex-end;flex-shrink:0;padding-bottom:2px;overflow-x:visible;}
+.act-col{display:flex;flex-direction:column;gap:5px;flex-shrink:0;margin-left:auto;}
+#boneyardBtn{
+  background:linear-gradient(145deg,#0e2010,#060d06);
+  border:1.5px solid rgba(212,168,67,.42);border-radius:12px;
+  padding:7px 8px;cursor:pointer;transition:all .18s;
+  display:flex;flex-direction:column;align-items:center;gap:3px;min-width:54px;
+}
+#boneyardBtn:active{transform:scale(.9);}
+#boneyardBtn:disabled{opacity:.25;pointer-events:none;}
+.bone-stack{display:flex;gap:2px;}
+.mini-t{width:8px;height:13px;background:linear-gradient(145deg,#f0ead8,#d8ceb0);
+  border-radius:2px;border:1px solid #2a1408;box-shadow:1px 1px 0 #1a0c06;}
+#byLabel{font-size:.55rem;color:var(--muted);font-weight:700;}
+#byCount{font-size:.7rem;color:var(--gold);font-weight:900;}
+#passBtn{
+  background:rgba(231,76,60,.08);border:1.5px solid rgba(231,76,60,.32);border-radius:9px;
+  padding:5px 8px;cursor:pointer;transition:all .18s;
+  font-family:'Nunito';font-size:.62rem;font-weight:800;color:#e74c3c;
+  display:none;align-items:center;gap:4px;
+}
+#passBtn.show{display:flex;}
+#passBtn:active{transform:scale(.9);}
+
+/* ═══ TILE ANIMATIONS ═══ */
+/* My tile: smashes from hand (bottom) to board */
+@keyframes smashFromBottom{
+  0%  {transform:perspective(300px) rotateX(-70deg) translateY(-40px) scale(1.4);opacity:.7;filter:brightness(2.5);}
+  50% {transform:perspective(300px) rotateX(10deg) translateY(6px) scale(1.1);opacity:1;filter:brightness(1.4);}
+  78% {transform:perspective(300px) rotateX(-2deg) translateY(-2px) scale(1.02);}
+  100%{transform:perspective(300px) rotateX(6deg);filter:brightness(1);}
+}
+@keyframes smashFromTop{
+  0%{transform:translateY(-130px) scale(.55);opacity:0;}
+  60%{transform:translateY(6px) scale(1.1);opacity:1;}
+  80%{transform:translateY(-2px);}
+  100%{transform:none;opacity:1;}
+}
+@keyframes smashFromLeft{
+  0%{transform:translateX(-130px) scale(.55);opacity:0;}
+  60%{transform:translateX(6px) scale(1.1);opacity:1;}
+  80%{transform:translateX(-2px);}
+  100%{transform:none;opacity:1;}
+}
+@keyframes smashFromRight{
+  0%{transform:translateX(130px) scale(.55);opacity:0;}
+  60%{transform:translateX(-6px) scale(1.1);opacity:1;}
+  80%{transform:translateX(2px);}
+  100%{transform:none;opacity:1;}
+}
+.smash-bottom{animation:smashFromBottom .35s cubic-bezier(.22,1,.36,1) both!important;}
+.smash-top   {animation:smashFromTop    .38s cubic-bezier(.22,1,.36,1) both!important;}
+.smash-left  {animation:smashFromLeft   .38s cubic-bezier(.22,1,.36,1) both!important;}
+.smash-right {animation:smashFromRight  .38s cubic-bezier(.22,1,.36,1) both!important;}
+
+@keyframes boardShake{0%,100%{transform:none}20%{transform:translateX(-5px) translateY(-2px)}40%{transform:translateX(5px)}60%{transform:translateX(-3px)}80%{transform:translateX(2px)}}
+.bshake{animation:boardShake .24s ease;}
+
+@keyframes drawIn{
+  from{transform:scale(0) rotate(-25deg) translateY(-40px);opacity:0;filter:brightness(2.5);}
+  65%{transform:scale(1.28) rotate(3deg);}
+  85%{transform:scale(.95);}
+  100%{transform:scale(1);filter:brightness(1);}
+}
+.draw-bounce{animation:drawIn .45s cubic-bezier(.34,1.56,.64,1) both;}
+
+/* Impact ring */
+.impact-ring{
+  position:fixed;pointer-events:none;z-index:300;
+  width:72px;height:72px;border-radius:50%;
+  border:3px solid rgba(212,168,67,.9);
+  transform:translate(-50%,-50%);
+  animation:impRing .52s ease forwards;
+}
+@keyframes impRing{
+  0%{transform:translate(-50%,-50%) scale(.15);opacity:1;}
+  100%{transform:translate(-50%,-50%) scale(4.5);opacity:0;border-width:0;}
+}
+.dust{
+  position:fixed;pointer-events:none;z-index:299;
+  width:64px;height:30px;border-radius:50%;
+  background:radial-gradient(ellipse,rgba(212,168,67,.32),transparent 70%);
+  transform:translate(-50%,-50%);
+  animation:dustOut .52s ease forwards;
+}
+@keyframes dustOut{0%{transform:translate(-50%,-50%) scale(.18);opacity:.9}100%{transform:translate(-50%,-50%) scale(3.2);opacity:0}}
+
+/* ═══ EMOJI REACTIONS ═══ */
+#emojiBar{
+  position:absolute;top:54px;left:50%;
+  transform:translateX(-50%) translateY(-8px);
+  background:rgba(4,8,2,.98);border:1px solid rgba(255,255,255,.1);
+  border-radius:20px;padding:12px 14px;
+  display:flex;gap:8px;flex-wrap:wrap;justify-content:center;
+  box-shadow:0 8px 36px rgba(0,0,0,.75);z-index:40;max-width:340px;
+  opacity:0;pointer-events:none;transition:opacity .18s,transform .18s;
+}
+#emojiBar.show{opacity:1;pointer-events:all;transform:translateX(-50%) translateY(0);}
+.emj-btn{
+  width:44px;height:44px;border-radius:14px;border:none;font-size:1.6rem;
+  background:rgba(255,255,255,.06);cursor:pointer;transition:all .14s;
+  display:flex;align-items:center;justify-content:center;
+  flex-direction:column;gap:1px;
+}
+.emj-btn span.emj-label{font-size:.42rem;color:var(--muted);font-weight:700;line-height:1;}
+.emj-btn:active{transform:scale(.74);}
+.emj-btn:hover{background:rgba(255,255,255,.13);}
+
+/* Floating emoji */
+.emj-float{
+  position:fixed;pointer-events:none;z-index:500;font-size:3.5rem;
+  animation:emjFloat 2.6s cubic-bezier(.2,.8,.4,1) forwards;
+  filter:drop-shadow(0 3px 8px rgba(0,0,0,.55));
+}
+@keyframes emjFloat{
+  0%  {transform:scale(0) rotate(-12deg);opacity:0;}
+  12% {transform:scale(1.7) rotate(6deg);opacity:1;}
+  50% {transform:scale(1.1) translateY(-80px);opacity:1;}
+  100%{transform:scale(.6) translateY(-220px) rotate(10deg);opacity:0;}
+}
+.emj-tag{
+  position:fixed;pointer-events:none;z-index:499;
+  font-size:.72rem;font-weight:800;
+  background:rgba(0,0,0,.7);color:#fff;
+  padding:3px 9px;border-radius:10px;
+  animation:emjFloat 2.6s cubic-bezier(.2,.8,.4,1) forwards;
+  animation-delay:.1s;
+}
+
+/* ═══ MUSIC PANEL ═══ */
+#musicPanel{
+  position:absolute;bottom:calc(132px + var(--safe-b));right:8px;
+  background:rgba(4,8,2,.98);border:1px solid rgba(255,255,255,.09);
+  border-radius:18px;padding:13px 14px;width:270px;
+  box-shadow:0 10px 44px rgba(0,0,0,.75);z-index:40;
+  opacity:0;pointer-events:none;transform:translateY(12px);
+  transition:opacity .2s,transform .2s;
+}
+#musicPanel.show{opacity:1;pointer-events:all;transform:none;}
+.mp-hdr{font-size:.66rem;color:var(--muted);font-weight:800;letter-spacing:.08em;text-transform:uppercase;
+  margin-bottom:8px;display:flex;align-items:center;gap:6px;}
+.eq{display:flex;gap:2px;align-items:flex-end;height:14px;}
+.eq-bar{width:3px;border-radius:1px;background:var(--gold);animation:eqA .55s ease infinite;opacity:0;}
+.eq-bar:nth-child(1){animation-delay:0s;height:8px;}
+.eq-bar:nth-child(2){animation-delay:.14s;height:12px;}
+.eq-bar:nth-child(3){animation-delay:.28s;height:6px;}
+.eq-bar.on{opacity:1;}
+@keyframes eqA{0%,100%{transform:scaleY(1)}50%{transform:scaleY(.25)}}
+.mp-song{font-size:.7rem;color:var(--text);font-weight:700;opacity:.65;
+  white-space:nowrap;overflow:hidden;text-overflow:ellipsis;margin-bottom:7px;}
+.mp-inp{width:100%;background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.1);
+  border-radius:9px;padding:7px 10px;color:var(--text);font-family:'Nunito';
+  font-size:.78rem;outline:none;margin-bottom:7px;transition:border-color .2s;}
+.mp-inp:focus{border-color:var(--gold);}
+.mp-inp::placeholder{color:rgba(255,255,255,.18);}
+.mp-load{width:100%;padding:7px;border:none;border-radius:8px;
+  background:rgba(212,168,67,.13);border:1px solid rgba(212,168,67,.28);
+  color:var(--gold);font-family:'Nunito';font-size:.76rem;font-weight:800;cursor:pointer;
+  margin-bottom:8px;transition:all .15s;}
+.mp-load:active{transform:scale(.96);}
+.mp-ctrl{display:flex;align-items:center;gap:6px;}
+.mp-btn{width:30px;height:30px;border-radius:8px;border:none;cursor:pointer;
+  background:rgba(255,255,255,.07);color:var(--text);font-size:.85rem;
+  display:flex;align-items:center;justify-content:center;transition:all .14s;flex-shrink:0;}
+.mp-btn:active{transform:scale(.86);}
+.mp-btn.primary{background:rgba(212,168,67,.14);border:1px solid rgba(212,168,67,.3);color:var(--gold);}
+#mpBar{flex:1;height:5px;border-radius:3px;background:rgba(255,255,255,.1);cursor:pointer;position:relative;}
+#mpBarInner{height:100%;background:var(--gold);border-radius:3px;width:0%;transition:width .5s linear;}
+#mpTime{font-size:.6rem;color:var(--muted);font-weight:700;flex-shrink:0;min-width:28px;text-align:right;}
+#mpStatus{font-size:.62rem;color:var(--muted);margin-top:5px;text-align:center;min-height:12px;}
+audio{display:none;}
+
+/* ═══ OVERLAYS ═══ */
+.overlay{position:fixed;inset:0;z-index:600;background:rgba(0,0,0,.72);backdrop-filter:blur(5px);
+  display:flex;align-items:flex-end;justify-content:center;
+  opacity:0;pointer-events:none;transition:opacity .22s;}
+.overlay.show{opacity:1;pointer-events:all;}
+.sheet{width:100%;max-width:480px;background:linear-gradient(158deg,#0c1808,#060e04);
+  border-radius:22px 22px 0 0;border:1px solid rgba(255,255,255,.06);border-bottom:none;
+  padding:0 0 calc(16px + var(--safe-b));
+  transform:translateY(100%);transition:transform .28s cubic-bezier(.34,.7,.46,1);
+  max-height:85dvh;overflow-y:auto;}
+.overlay.show .sheet{transform:translateY(0);}
+.sheet-handle{width:34px;height:4px;border-radius:2px;background:rgba(255,255,255,.09);margin:10px auto 0;}
+.sheet-hdr{display:flex;align-items:center;gap:8px;padding:11px 15px 9px;border-bottom:1px solid rgba(255,255,255,.05);}
+.sheet-hdr h3{font-size:.92rem;font-weight:800;flex:1;}
+.sheet-close{width:25px;height:25px;border-radius:7px;border:none;cursor:pointer;
+  background:rgba(255,255,255,.05);color:var(--muted);display:flex;align-items:center;justify-content:center;}
+
+/* Side picker */
+.side-opts{display:flex;flex-direction:column;gap:8px;padding:12px 14px;}
+.side-opt{padding:14px 15px;border-radius:12px;cursor:pointer;border:none;
+  font-family:'Nunito';font-weight:800;font-size:.92rem;
+  display:flex;align-items:center;gap:10px;transition:all .14s;}
+.side-opt:active{transform:scale(.97);}
+.side-opt.left {background:rgba(41,128,185,.12);border:1.5px solid rgba(41,128,185,.36);color:#5dade2;}
+.side-opt.right{background:rgba(39,174,96,.12); border:1.5px solid rgba(39,174,96,.36); color:#2ecc71;}
+.side-opt.auto {background:rgba(212,168,67,.09); border:1.5px solid rgba(212,168,67,.35);color:var(--gold);}
+.side-sub{font-size:.68rem;opacity:.5;font-weight:600;}
+
+/* Players */
+.p-row{display:flex;align-items:center;gap:9px;padding:10px 15px;border-bottom:1px solid rgba(255,255,255,.04);}
+.p-row.active{background:rgba(212,168,67,.06);}
+.p-row.me{background:rgba(41,128,185,.05);}
+.p-av{width:36px;height:36px;border-radius:50%;display:flex;align-items:center;justify-content:center;
+  font-weight:900;font-size:.88rem;color:#fff;flex-shrink:0;border:2px solid rgba(255,255,255,.1);}
+.p-info{flex:1;min-width:0;}
+.p-name{font-weight:800;font-size:.85rem;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+.p-sub{font-size:.68rem;color:var(--muted);}
+.p-pill{background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.09);border-radius:7px;
+  padding:3px 7px;font-size:.7rem;font-weight:800;display:flex;align-items:center;gap:3px;flex-shrink:0;}
+.sc-row{display:flex;align-items:center;gap:9px;padding:7px 15px;border-bottom:1px solid rgba(255,255,255,.03);}
+.sc-rank{width:19px;height:19px;border-radius:6px;background:rgba(212,168,67,.09);border:1px solid rgba(212,168,67,.2);
+  display:flex;align-items:center;justify-content:center;font-size:.68rem;color:var(--gold);font-weight:900;}
+.sc-name{flex:1;font-weight:700;font-size:.83rem;}
+.sc-val{font-weight:900;font-size:.95rem;color:var(--gold);}
+
+/* Chat */
+#chatMsgs{max-height:44vh;overflow-y:auto;padding:8px 13px;display:flex;flex-direction:column;gap:4px;
+  scrollbar-width:thin;scrollbar-color:#1a3a14 transparent;}
+.cm{display:flex;gap:6px;animation:cmIn .18s ease;}
+@keyframes cmIn{from{opacity:0;transform:translateY(4px)}to{opacity:1;transform:none}}
+.cm.sys{justify-content:center;}
+.sys-t{font-size:.68rem;color:#3a6030;padding:2px 8px;background:rgba(255,255,255,.02);border-radius:7px;}
+.cm.mine{flex-direction:row-reverse;}
+.cm-av{width:23px;height:23px;border-radius:50%;display:flex;align-items:center;justify-content:center;
+  font-size:.62rem;font-weight:900;flex-shrink:0;margin-top:2px;}
+.cm-bub{max-width:80%;padding:6px 10px;border-radius:12px 12px 12px 3px;font-size:.8rem;line-height:1.38;
+  background:rgba(255,255,255,.07);}
+.cm.mine .cm-bub{border-radius:12px 12px 3px 12px;background:rgba(212,168,67,.09);}
+.cm-name{font-size:.62rem;font-weight:800;margin-bottom:1px;opacity:.55;}
+.chat-inp{display:flex;gap:6px;padding:8px 13px 0;}
+.chat-inp input{flex:1;background:rgba(255,255,255,.06);border:1.5px solid rgba(255,255,255,.08);
+  border-radius:10px;padding:9px 11px;color:var(--text);font-family:'Nunito';font-size:.88rem;
+  outline:none;transition:border-color .2s;}
+.chat-inp input:focus{border-color:rgba(212,168,67,.4);}
+.chat-inp button{width:37px;height:37px;border-radius:10px;border:none;cursor:pointer;
+  background:rgba(212,168,67,.13);border:1px solid rgba(212,168,67,.28);color:var(--gold);
+  font-size:.86rem;display:flex;align-items:center;justify-content:center;transition:all .14s;}
+.chat-inp button:active{transform:scale(.88);}
+
+/* Win */
+#winBox{position:fixed;inset:0;z-index:900;background:rgba(0,0,0,.88);backdrop-filter:blur(10px);
+  display:none;align-items:center;justify-content:center;padding:22px;}
+#winBox.show{display:flex;}
+.wb{background:linear-gradient(145deg,#0c1a06,#060e04);border:1.5px solid var(--gold);
+  border-radius:22px;padding:30px 24px;text-align:center;width:100%;max-width:340px;
+  box-shadow:0 0 80px rgba(212,168,67,.28);animation:wbPop .42s cubic-bezier(.34,1.56,.64,1);}
+@keyframes wbPop{from{transform:scale(.4);opacity:0}to{transform:none;opacity:1}}
+.wb-trophy{font-size:3rem;display:block;margin-bottom:8px;animation:trophySpin 3s ease infinite;}
+@keyframes trophySpin{0%,100%{transform:rotate(-7deg) scale(1)}50%{transform:rotate(7deg) scale(1.1)}}
+.wb h2{font-family:'Cinzel Decorative',serif;font-size:1.4rem;color:var(--gold);margin-bottom:4px;}
+.wb p{color:var(--muted);font-size:.84rem;margin-bottom:13px;}
+.wr{display:flex;justify-content:space-between;padding:5px 9px;border-radius:8px;
+  margin-bottom:3px;background:rgba(255,255,255,.03);}
+.wr span.v{color:var(--gold);font-weight:900;}
+.wb-acts{display:flex;gap:7px;margin-top:13px;}
+.wb-btn{flex:1;padding:12px;border:none;border-radius:12px;font-family:'Nunito';font-weight:800;font-size:.88rem;cursor:pointer;transition:all .14s;}
+.wb-btn:active{transform:scale(.96);}
+.wb-btn.p{background:linear-gradient(135deg,#d4a843,#a07828);color:#06100a;}
+.wb-btn.s{background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.1);color:var(--text);}
+
+/* Notifs */
+#notifs{position:fixed;top:56px;left:50%;transform:translateX(-50%);z-index:700;
+  width:calc(100% - 20px);max-width:320px;display:flex;flex-direction:column;gap:4px;pointer-events:none;align-items:center;}
+.ntf{background:rgba(4,8,2,.97);border:1px solid rgba(212,168,67,.28);border-radius:10px;
+  padding:7px 13px;font-size:.75rem;font-weight:700;
+  box-shadow:0 4px 18px rgba(0,0,0,.7);text-align:center;width:100%;
+  animation:nIn .2s ease,nOut .2s ease 2.7s forwards;}
+@keyframes nIn{from{opacity:0;transform:translateY(-6px)}to{opacity:1;transform:none}}
+@keyframes nOut{to{opacity:0;transform:translateY(-6px)}}
+.ntf.ok{border-color:rgba(39,174,96,.45);}
+.ntf.err{border-color:rgba(231,76,60,.45);}
+.ntf.warn{border-color:rgba(230,126,34,.45);}
+
+/* Confetti */
+.cf{position:fixed;width:9px;height:13px;top:-16px;border-radius:2px;
+  pointer-events:none;z-index:950;animation:cfFall linear forwards;}
+@keyframes cfFall{to{transform:translateY(112vh) rotate(750deg);opacity:0}}
+</style>
+</head>
+<body>
+
+<!-- LOGIN -->
+<div id="loginScreen">
+  <div class="lg-logo">🎲</div>
+  <div class="lg-title">Domino 101</div>
+  <div class="lg-sub">Gerçek zamanlı · 4 oyunculu · Çok şık</div>
+  <div class="lg-card">
+    <div class="inp-g"><i class="fas fa-user"></i><input id="nameInp" type="text" placeholder="Adınız..." maxlength="18" autocomplete="off" autocorrect="off"/></div>
+    <div class="inp-g"><i class="fas fa-door-open"></i><input id="roomInp" type="text" placeholder="Oda adı" maxlength="20" autocomplete="off" value="oda1"/></div>
+    <button class="btn-join" onclick="doJoin()"><i class="fas fa-dice"></i> Oyuna Gir</button>
+  </div>
+</div>
+
+<!-- EMOJI BAR — popup at top -->
+<div id="emojiBar"><!-- built by JS --></div>
+
+<!-- MUSIC PANEL -->
+<div id="musicPanel">
+  <div class="mp-hdr"><i class="fas fa-music"></i> Müzik
+    <div class="eq"><div class="eq-bar" id="eq1"></div><div class="eq-bar" id="eq2"></div><div class="eq-bar" id="eq3"></div></div>
+  </div>
+  <div class="mp-song" id="mpSong">— Şarkı seçilmedi —</div>
+  <input class="mp-inp" id="mpUrl" type="url" placeholder="MP3 link (https://...)" autocomplete="off"/>
+  <button class="mp-load" onclick="musicLoad()">📥 Yükle &amp; Herkesle Paylaş</button>
+  <div class="mp-ctrl">
+    <button class="mp-btn" onclick="musicSeek(-10)"><i class="fas fa-backward-step"></i></button>
+    <button class="mp-btn primary" id="mpPlayBtn" onclick="musicToggle()"><i class="fas fa-play"></i></button>
+    <button class="mp-btn" onclick="musicSeek(10)"><i class="fas fa-forward-step"></i></button>
+    <div id="mpBar" onclick="musicBarClick(event)"><div id="mpBarInner"></div></div>
+    <div id="mpTime">0:00</div>
+  </div>
+  <div id="mpStatus"></div>
+  <audio id="bgAudio" crossorigin="anonymous" preload="auto"></audio>
+</div>
+
+<!-- SIDE PICKER -->
+<div class="overlay" id="sideOv">
+  <div class="sheet" onclick="event.stopPropagation()">
+    <div class="sheet-handle"></div>
+    <div class="sheet-hdr"><i class="fas fa-arrows-left-right" style="color:var(--gold)"></i><h3>Nereye Koy?</h3></div>
+    <div class="side-opts">
+      <button class="side-opt left"  onclick="confirmSide('left')"><i class="fas fa-arrow-left"></i><div><div>Sol Uca</div><div class="side-sub" id="sideL"></div></div></button>
+      <button class="side-opt right" onclick="confirmSide('right')"><i class="fas fa-arrow-right"></i><div><div>Sağ Uca</div><div class="side-sub" id="sideR"></div></div></button>
+      <button class="side-opt auto"  onclick="confirmSide('auto')"><i class="fas fa-wand-magic-sparkles"></i><div><div>Otomatik</div><div class="side-sub">Uygun yere koy</div></div></button>
+    </div>
+  </div>
+</div>
+
+<!-- PLAYERS -->
+<div class="overlay" id="playersOv" onclick="closeOv('playersOv')">
+  <div class="sheet" onclick="event.stopPropagation()">
+    <div class="sheet-handle"></div>
+    <div class="sheet-hdr"><i class="fas fa-users" style="color:var(--gold)"></i><h3>Oyuncular</h3><button class="sheet-close" onclick="closeOv('playersOv')"><i class="fas fa-xmark"></i></button></div>
+    <div id="playersCnt"></div>
+    <div style="padding:10px 13px 0">
+      <div style="background:rgba(212,168,67,.04);border:1px solid var(--border);border-radius:12px;overflow:hidden;">
+        <div style="padding:5px 12px;font-size:.66rem;letter-spacing:.1em;text-transform:uppercase;color:var(--muted);border-bottom:1px solid rgba(255,255,255,.04)"><i class="fas fa-trophy"></i> Skor</div>
+        <div id="scoresCnt"></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- CHAT -->
+<div class="overlay" id="chatOv" onclick="closeOv('chatOv')">
+  <div class="sheet" onclick="event.stopPropagation()">
+    <div class="sheet-handle"></div>
+    <div class="sheet-hdr"><i class="fas fa-comments" style="color:var(--gold)"></i><h3>Sohbet</h3><button class="sheet-close" onclick="closeOv('chatOv')"><i class="fas fa-xmark"></i></button></div>
+    <div id="chatMsgs"></div>
+    <div class="chat-inp">
+      <input id="chatInp" type="text" placeholder="Mesaj..." maxlength="200" autocomplete="off"/>
+      <button onclick="sendChat()"><i class="fas fa-paper-plane"></i></button>
+    </div>
+  </div>
+</div>
+
+<!-- WIN -->
+<div id="winBox">
+  <div class="wb">
+    <span class="wb-trophy">🏆</span>
+    <h2>Oyun Bitti!</h2>
+    <p id="winMsg">—</p>
+    <div id="winScores"></div>
+    <div class="wb-acts">
+      <button class="wb-btn p" onclick="newRound()"><i class="fas fa-redo"></i> Yeni Tur</button>
+      <button class="wb-btn s" onclick="document.getElementById('winBox').classList.remove('show')">Kapat</button>
+    </div>
+  </div>
+</div>
+
+<div id="notifs"></div>
+
+<!-- APP -->
+<div id="app">
+  <div id="topbar">
+    <div class="tb-logo"><i class="fas fa-dice-d6"></i> Domino 101</div>
+    <div class="chip chip-round" id="tbRound"><i class="fas fa-layer-group"></i> T1</div>
+    <div class="chip chip-turn"><div class="bdot"></div><span id="tbTurn">—</span></div>
+    <div class="tb-acts">
+      <button class="ib green" id="btnStart" onclick="startGame()"><i class="fas fa-play"></i></button>
+      <button class="ib pink"   id="emojiBtn" onclick="toggleEmoji()" title="Emoji Tepkileri">😄</button>
+      <button class="ib orange" id="musicBtn" onclick="toggleMusic()" title="Müzik">🎵</button>
+      <button class="ib gold"   onclick="openOv('playersOv')"><i class="fas fa-users"></i></button>
+      <button class="ib blue"   id="chatBtn"  onclick="openChat()"><i class="fas fa-comments"></i></button>
+    </div>
+  </div>
+
+  <div id="table">
+    <!-- Opponents -->
+    <div class="opp-zone" id="opp-top">
+      <div class="opp-empty" id="oe-top"><i class="fas fa-user-slash"></i><span>Bekleniyor</span></div>
+      <div class="opp-info" id="oi-top" style="display:none">
+        <div class="opp-av" id="oa-top">?</div>
+        <span class="opp-name" id="on-top">—</span>
+        <span class="opp-cnt"  id="oc-top">0</span>
+      </div>
+    </div>
+    <div class="opp-zone" id="opp-left">
+      <div class="opp-empty" id="oe-left"><i class="fas fa-user-slash"></i><span>Bekleniyor</span></div>
+      <div class="opp-info" id="oi-left" style="display:none">
+        <div class="opp-av" id="oa-left">?</div>
+        <span class="opp-name" id="on-left">—</span>
+        <span class="opp-cnt"  id="oc-left">0</span>
+      </div>
+    </div>
+    <div class="opp-zone" id="opp-right">
+      <div class="opp-empty" id="oe-right"><i class="fas fa-user-slash"></i><span>Bekleniyor</span></div>
+      <div class="opp-info" id="oi-right" style="display:none">
+        <div class="opp-av" id="oa-right">?</div>
+        <span class="opp-name" id="on-right">—</span>
+        <span class="opp-cnt"  id="oc-right">0</span>
+      </div>
+    </div>
+
+    <!-- Board -->
+    <div id="boardWrap"><div id="boardInner">
+      <div id="emptyBoard"><i class="fas fa-dice-d6"></i>Oyun başlamayı bekliyor...</div>
+    </div></div>
+  </div>
+
+  <!-- My hand -->
+  <div id="handStrip">
+    <div id="handTiles"></div>
+    <div class="act-col">
+      <button id="boneyardBtn" onclick="drawTile()" disabled>
+        <div class="bone-stack"><span class="mini-t"></span><span class="mini-t"></span><span class="mini-t"></span></div>
+        <div id="byLabel">Pazar</div><div id="byCount">0</div>
+      </button>
+      <button id="passBtn" onclick="passTurn()"><i class="fas fa-forward"></i> Pas</button>
+    </div>
+  </div>
+</div>
+
+<script>
+/* ════════════════════════════════════════
+   AUDIO ENGINE
+════════════════════════════════════════ */
+let _ac=null;
+function AC(){if(!_ac)_ac=new(window.AudioContext||window.webkitAudioContext)();return _ac;}
+function beep(f,d,v,t='sine',delay=0){
+  try{const c=AC();if(c.state==='suspended')c.resume();
+  const now=c.currentTime+delay;
+  const o=c.createOscillator(),g=c.createGain();
+  o.type=t;o.frequency.setValueAtTime(f,now);
+  g.gain.setValueAtTime(v,now);g.gain.exponentialRampToValueAtTime(.001,now+d);
+  o.connect(g);g.connect(c.destination);o.start(now);o.stop(now+d+.01);}catch(e){}
+}
+function sndDrop(){
+  try{const c=AC();if(c.state==='suspended')c.resume();const now=c.currentTime;
+  const o1=c.createOscillator(),g1=c.createGain();
+  o1.type='sine';o1.frequency.setValueAtTime(200,now);o1.frequency.exponentialRampToValueAtTime(38,now+.26);
+  g1.gain.setValueAtTime(1.6,now);g1.gain.exponentialRampToValueAtTime(.001,now+.3);
+  o1.connect(g1);g1.connect(c.destination);o1.start(now);o1.stop(now+.32);
+  const buf=c.createBuffer(1,c.sampleRate*.055,c.sampleRate);
+  const d=buf.getChannelData(0);
+  for(let i=0;i<d.length;i++)d[i]=(Math.random()*2-1)*Math.exp(-i/(d.length*.1));
+  const src=c.createBufferSource(),gn=c.createGain();
+  src.buffer=buf;gn.gain.setValueAtTime(1.3,now);gn.gain.exponentialRampToValueAtTime(.001,now+.055);
+  src.connect(gn);gn.connect(c.destination);src.start(now);
+  const o2=c.createOscillator(),g2=c.createGain();
+  o2.type='square';o2.frequency.setValueAtTime(1000,now+.01);o2.frequency.exponentialRampToValueAtTime(220,now+.09);
+  g2.gain.setValueAtTime(.32,now+.01);g2.gain.exponentialRampToValueAtTime(.001,now+.11);
+  o2.connect(g2);g2.connect(c.destination);o2.start(now+.01);o2.stop(now+.12);}catch(e){}
+}
+function sndDraw(){ beep(130,.14,.5);setTimeout(()=>beep(80,.1,.35),110); }
+function sndWin(){ [523,659,784,1047,1319].forEach((f,i)=>beep(f,.2,.22,'triangle',i*.08)); }
+
+/* ════════════════════════════════════════
+   EMOJI DATA — sesli emojiler
+════════════════════════════════════════ */
+const EMOJIS=[
+  {e:'😂',l:'Kahkaha', s:()=>{for(let i=0;i<6;i++)beep(460+i*22,.14,.2,'sine',i*.09);}},
+  {e:'🔥',l:'Ateş',    s:()=>{beep(200,.32,.32,'sawtooth');beep(140,.3,.22,'square',.05);}},
+  {e:'👏',l:'Alkış',   s:()=>{for(let i=0;i<5;i++)beep(300+i*30,.08,.26,'square',i*.11);}},
+  {e:'😱',l:'Şok',     s:()=>{beep(880,.04,.35);setTimeout(()=>beep(300,.24,.28),50);}},
+  {e:'😡',l:'Kızgın',  s:()=>{beep(110,.36,.45,'sawtooth');}},
+  {e:'🎉',l:'Parti',   s:()=>{[500,700,600,800,900].forEach((f,i)=>beep(f,.1,.22,'triangle',i*.06));}},
+  {e:'💀',l:'Bitik',   s:()=>{beep(90,.45,.38,'square');beep(70,.34,.3,'square',.25);}},
+  {e:'🫶',l:'Sevgi',   s:()=>{beep(440,.16,.22);beep(554,.16,.22,.18);}},
+  {e:'🤡',l:'Palyaço', s:()=>{[700,500,600,400].forEach((f,i)=>beep(f,.1,.26,'square',i*.09));}},
+  {e:'👑',l:'Kral',    s:()=>{[523,659,784].forEach((f,i)=>beep(f,.2,.24,'triangle',i*.1));}},
+  {e:'💩',l:'Çöp',     s:()=>{beep(180,.24,.32,'sawtooth');beep(120,.3,.22,'square',.12);}},
+  {e:'🚀',l:'Roket',   s:()=>{try{const c=AC();const o=c.createOscillator(),g=c.createGain();o.type='sawtooth';o.frequency.setValueAtTime(160,c.currentTime);o.frequency.exponentialRampToValueAtTime(900,c.currentTime+.35);g.gain.setValueAtTime(.3,c.currentTime);g.gain.exponentialRampToValueAtTime(.001,c.currentTime+.35);o.connect(g);g.connect(c.destination);o.start(c.currentTime);o.stop(c.currentTime+.36);}catch(e){}}},
+];
+
+/* ════════════════════════════════════════
+   DOTS POSITIONS (% based)
+════════════════════════════════════════ */
+const DOTS={
+  0:[],
+  1:[[50,50]],
+  2:[[28,28],[72,72]],
+  3:[[28,28],[50,50],[72,72]],
+  4:[[28,28],[72,28],[28,72],[72,72]],
+  5:[[28,28],[72,28],[50,50],[28,72],[72,72]],
+  6:[[28,22],[72,22],[28,50],[72,50],[28,78],[72,78]]
+};
+
+/* ════════════════════════════════════════
+   STATE
+════════════════════════════════════════ */
+let socket,myId,myName;
+let myHand=[],roomState=null;
+let selectedId=null,pendingId=null;
+let unread=0,chatOpen=false;
+let lastBoardLen=0,lastPlacedBy=null;
+let emojiOpen=false,musicOpen=false;
+let mpInterval=null;
+
+/* ════════════════════════════════════════
+   BUILD EMOJI BAR — popup with labels
+════════════════════════════════════════ */
+function buildEmojiBar(){
+  const bar=document.getElementById('emojiBar');
+  EMOJIS.forEach(item=>{
+    const b=document.createElement('button');
+    b.className='emj-btn';
+    b.innerHTML=`<span>${item.e}</span><span class="emj-label">${item.l}</span>`;
+    b.title=item.l;
+    b.onclick=()=>{
+      if(socket) socket.emit('emoji_react',{emoji:item.e});
+      toggleEmoji(true);
+    };
+    bar.appendChild(b);
+  });
+}
+function toggleEmoji(forceClose){
+  emojiOpen=forceClose?false:!emojiOpen;
+  document.getElementById('emojiBar').classList.toggle('show',emojiOpen);
+  if(emojiOpen){musicOpen=false;document.getElementById('musicPanel').classList.remove('show');}
+}
+function toggleMusic(forceClose){
+  musicOpen=forceClose?false:!musicOpen;
+  document.getElementById('musicPanel').classList.toggle('show',musicOpen);
+  if(musicOpen){emojiOpen=false;document.getElementById('emojiBar').classList.remove('show');}
+}
+
+/* ════════════════════════════════════════
+   MUSIC — real-time sync
+════════════════════════════════════════ */
+function musicLoad(){
+  const url=document.getElementById('mpUrl').value.trim();
+  if(!url||!url.startsWith('http')){notify('❌ Geçerli MP3 link girin!','err');return;}
+  socket.emit('music_set',{url});
+  document.getElementById('mpStatus').textContent='⏳ Yükleniyor...';
+}
+function musicToggle(){
+  const a=document.getElementById('bgAudio');
+  if(a.paused||a.ended) socket.emit('music_play',{position:a.currentTime||0});
+  else socket.emit('music_pause',{position:a.currentTime});
+}
+function musicSeek(delta){
+  const a=document.getElementById('bgAudio');
+  socket.emit('music_seek',{position:Math.max(0,(a.currentTime||0)+delta)});
+}
+function musicBarClick(e){
+  const bar=document.getElementById('mpBar');
+  const r=bar.getBoundingClientRect();
+  const pct=Math.max(0,Math.min(1,(e.clientX-r.left)/r.width));
+  const a=document.getElementById('bgAudio');
+  const dur=a.duration||0; if(!dur) return;
+  socket.emit('music_seek',{position:pct*dur});
+}
+function applyMusic(state){
+  const a=document.getElementById('bgAudio');
+  if(!state.url) return;
+  if(a.dataset.url!==state.url){
+    a.dataset.url=state.url; a.src=state.url; a.load();
+    const name=decodeURIComponent(state.url.split('/').pop().replace(/\?.*/,'')).slice(0,42);
+    document.getElementById('mpSong').textContent='🎵 '+name;
+    document.getElementById('mpUrl').value=state.url;
+    document.getElementById('mpStatus').textContent='⏳ Yükleniyor...';
+    a.oncanplaythrough=()=>{document.getElementById('mpStatus').textContent='';applyMusic(state);};
+    a.onerror=()=>{document.getElementById('mpStatus').textContent='❌ Yüklenemedi (CORS?)';}; return;
+  }
+  if(state.playing){
+    const sp=(Date.now()-state.startedAt)/1000;
+    if(Math.abs(a.currentTime-sp)>1.5) a.currentTime=sp;
+    if(a.paused) a.play().catch(()=>{});
+    document.getElementById('mpPlayBtn').innerHTML='<i class="fas fa-pause"></i>';
+    ['eq1','eq2','eq3'].forEach(id=>document.getElementById(id)?.classList.add('on'));
+    startMpProgress();
+  } else {
+    if(!a.paused) a.pause();
+    if(Math.abs(a.currentTime-state.pausedAt)>.5) a.currentTime=state.pausedAt;
+    document.getElementById('mpPlayBtn').innerHTML='<i class="fas fa-play"></i>';
+    ['eq1','eq2','eq3'].forEach(id=>document.getElementById(id)?.classList.remove('on'));
+    stopMpProgress();updateMpBar(a);
+  }
+}
+function startMpProgress(){
+  stopMpProgress();
+  mpInterval=setInterval(()=>updateMpBar(document.getElementById('bgAudio')),500);
+}
+function stopMpProgress(){if(mpInterval){clearInterval(mpInterval);mpInterval=null;}}
+function updateMpBar(a){
+  if(!a.duration) return;
+  document.getElementById('mpBarInner').style.width=(a.currentTime/a.duration*100)+'%';
+  const t=Math.floor(a.currentTime),m=Math.floor(t/60),s=t%60;
+  document.getElementById('mpTime').textContent=`${m}:${s.toString().padStart(2,'0')}`;
+}
+
+/* ════════════════════════════════════════
+   JOIN
+════════════════════════════════════════ */
+function doJoin(){
+  const name=document.getElementById('nameInp').value.trim();
+  const room=document.getElementById('roomInp').value.trim();
+  if(!name||!room){notify('⚠️ İsim ve oda!','warn');return;}
+  myName=name;
+  socket=io();
+  bindSocket();
+  socket.on('connect',()=>{myId=socket.id;socket.emit('join',{name,roomId:room});});
+  document.getElementById('loginScreen').classList.add('hide');
+  document.body.addEventListener('touchstart',()=>{try{AC().resume();}catch(e){}},{once:true});
+  document.body.addEventListener('click',()=>{try{AC().resume();}catch(e){}},{once:true});
+}
+
+/* ════════════════════════════════════════
+   SOCKET BINDINGS
+════════════════════════════════════════ */
+function bindSocket(){
+  socket.on('room_update',s=>{
+    roomState=s;
+    renderOpps(s);renderBoard(s);renderTopbar(s);renderBoneyard(s);renderPlayers(s);renderScores(s);
+    // Eğer el sayısı uyuşmuyorsa server'dan tekrar iste (packet kaybolma koruması)
+    const myInfo=s.players[myId];
+    if(myInfo && myInfo.handCount !== myHand.length){
+      socket.emit('request_hand');
+    }
+    renderHand();
+  });
+  socket.on('your_hand',h=>{myHand=h;renderHand();});
+  socket.on('game_started',({firstPlayer})=>{
+    document.getElementById('btnStart').style.display='none';
+    notify(firstPlayer===myId?'🟢 İlk sen oynuyorsun!':'🎲 Oyun başladı!','ok');
+  });
+  socket.on('tile_placed',({playerId,playerName,tile,side})=>{
+    lastPlacedBy=playerId;
+    if(playerId!==myId) notify(`${playerName}: [${tile.left}|${tile.right}]`);
+  });
+  socket.on('drew_tile',({tile,playable})=>{
+    sndDraw();
+    notify(playable?`✅ [${tile.left}|${tile.right}] oynanabilir!`:`❌ [${tile.left}|${tile.right}] oynanamaz`,playable?'ok':'warn');
+    setTimeout(()=>{const el=document.querySelector(`#handTiles .domino[data-id="${tile.id}"]`);if(el)el.classList.add('draw-bounce');},60);
+  });
+  socket.on('game_over',({winner,winnerName,scores})=>{showWin(winner,winnerName,scores);sndWin();spawnConfetti();});
+  socket.on('new_round_started',({round})=>{
+    document.getElementById('winBox').classList.remove('show');lastBoardLen=0;
+    notify(`🔄 ${round}. tur başladı!`,'ok');
+  });
+  socket.on('error_msg',m=>notify('❌ '+m,'err'));
+  socket.on('chat',d=>{appendChat(d);if(!chatOpen&&!d.system){unread++;updChatBadge();}});
+  socket.on('emoji_react',({senderId,name,color,emoji})=>{
+    spawnEmoji(emoji,name,color);
+    EMOJIS.find(e=>e.e===emoji)?.s();
+  });
+  socket.on('music_state',state=>applyMusic(state));
+}
+
+/* ════════════════════════════════════════
+   ACTIONS
+════════════════════════════════════════ */
+function startGame(){socket.emit('start_game');}
+function drawTile(){socket.emit('draw_tile');}
+function passTurn(){socket.emit('pass_turn');}
+function newRound(){socket.emit('new_round');}
+
+function selectTile(tileId){
+  if(!roomState?.started||roomState.turn!==myId) return;
+  const tile=myHand.find(t=>t.id===tileId); if(!tile) return;
+  if(selectedId===tileId){selectedId=null;renderHand();return;}
+  selectedId=tileId;renderHand();
+  if(!roomState.board||roomState.board.length===0){doPlace(tileId,'auto');return;}
+  const {left,right}=roomState.ends;
+  const canL=tile.left===left||tile.right===left;
+  const canR=tile.left===right||tile.right===right;
+  if(canL&&canR&&left!==right){
+    pendingId=tileId;
+    document.getElementById('sideL').textContent=`Sol uç: ${left}`;
+    document.getElementById('sideR').textContent=`Sağ uç: ${right}`;
+    openOv('sideOv');
+  } else { doPlace(tileId,'auto'); }
+}
+function doPlace(tileId,side){selectedId=null;pendingId=null;socket.emit('place_tile',{tileId,side});}
+function confirmSide(side){const t=pendingId;closeOv('sideOv');if(t)doPlace(t,side);}
+
+/* ════════════════════════════════════════
+   RENDER HAND
+════════════════════════════════════════ */
+function canPlayT(tile){
+  if(!roomState?.started) return false;
+  if(!roomState.board||!roomState.board.length) return true;
+  const{left,right}=roomState.ends;
+  return tile.left===left||tile.right===left||tile.left===right||tile.right===right;
+}
+function renderHand(){
+  const c=document.getElementById('handTiles');c.innerHTML='';
+  const myTurn=roomState?.started&&roomState.turn===myId;
+  document.getElementById('handStrip').classList.toggle('my-turn',!!myTurn);
+  const hasPlay=myTurn&&myHand.some(t=>canPlayT(t));
+  document.getElementById('passBtn').classList.toggle('show',!!myTurn&&!hasPlay&&roomState?.boneyardCount===0);
+
+  myHand.forEach((tile,i)=>{
+    const play=myTurn&&canPlayT(tile);
+    const sel=selectedId===tile.id;
+    const el=makeDomino(tile,false,play,sel);
+    el.style.animation=`drawIn .3s cubic-bezier(.34,1.56,.64,1) ${i*.025}s both`;
+    if(play||sel) el.addEventListener('click',()=>selectTile(tile.id));
+    c.appendChild(el);
+  });
+}
+
+/* ════════════════════════════════════════
+   RENDER BOARD — snake kıvrımlı
+════════════════════════════════════════ */
+const BEND_EVERY=8; // kaçta bir köşe dönülsün
+
+function renderBoard(s){
+  const inner=document.getElementById('boardInner');
+  const emptyEl=document.getElementById('emptyBoard');
+  if(!s.board||!s.board.length){
+    emptyEl.style.display='flex';
+    Array.from(inner.children).forEach(ch=>{if(ch.id!=='emptyBoard')ch.remove();});
+    lastBoardLen=0;return;
+  }
+  emptyEl.style.display='none';
+  const newCount=s.board.length-lastBoardLen;
+  const isNew=newCount>0;
+
+  Array.from(inner.children).forEach(ch=>{if(ch.id!=='emptyBoard')ch.remove();});
+
+  // Determine fly direction
+  let flyClass='smash-bottom';
+  if(isNew&&lastPlacedBy&&lastPlacedBy!==myId&&roomState){
+    const mi=roomState.order.indexOf(myId);
+    const ti=roomState.order.indexOf(lastPlacedBy);
+    if(ti>=0){const rel=((ti-mi+roomState.order.length)%roomState.order.length);
+      flyClass=rel===1?'smash-left':rel===2?'smash-top':rel===3?'smash-right':'smash-bottom';}
+  }
+
+  s.board.forEach((tile,i)=>{
+    const isDbl=tile.left===tile.right;
+    const el=makeDomino(tile,true,false,false);
+    el.classList.add('on-board');
+    if(isDbl) el.classList.add('is-double');
+
+    // Organik eğim: çift taşlar dik durur, diğerleri hafifçe eğilir
+    if(!isDbl){
+      if(i%2===0) el.classList.add('tilt-p');
+      else el.classList.add('tilt-n');
+    }
+
+    // Yılan köşe: BEND_EVERY aralıklarla sıradaki tile'ı biraz aşağı kaydır
+    if(i>0&&i%BEND_EVERY===0){
+      el.style.marginTop='6px';
+      el.style.marginLeft='-2px';
+    }
+
+    const newest=(isNew&&(i===s.board.length-1||i===0)&&s.board.length>lastBoardLen);
+    if(newest){
+      el.classList.add(flyClass);
+      el.addEventListener('animationend',()=>{
+        el.classList.remove(flyClass);
+        const r=el.getBoundingClientRect();
+        spawnImpact(r.left+r.width/2,r.top+r.height/2);
+        sndDrop();
+        inner.classList.add('bshake');
+        setTimeout(()=>inner.classList.remove('bshake'),260);
+      },{once:true});
+    }
+    inner.appendChild(el);
+  });
+
+  lastBoardLen=s.board.length;
+  setTimeout(()=>{
+    const bw=document.getElementById('boardWrap');
+    bw.scrollLeft=bw.scrollWidth;
+    bw.scrollTop=bw.scrollHeight/2-bw.clientHeight/2;
+  },60);
+}
+
+/* ════════════════════════════════════════
+   RENDER OPPONENTS — telefonda görünür
+════════════════════════════════════════ */
+function renderOpps(s){
+  if(!s.order||!myId) return;
+  const mi=s.order.indexOf(myId); if(mi===-1) return;
+  const slots=['left','top','right'];
+
+  [1,2,3].forEach((offset,si)=>{
+    const slot=slots[si];
+    const idx=(mi+offset)%s.order.length;
+    const pid=s.order.length>offset?s.order[idx]:null;
+    const zone=document.getElementById('opp-'+slot);
+    const emptyEl=document.getElementById('oe-'+slot);
+    const infoEl=document.getElementById('oi-'+slot);
+
+    // Eski kartları temizle
+    Array.from(zone.querySelectorAll('.opp-card')).forEach(c=>c.remove());
+
+    if(!pid||!s.players[pid]){
+      emptyEl.style.display='flex';infoEl.style.display='none';return;
+    }
+    const p=s.players[pid];
+    emptyEl.style.display='none';infoEl.style.display='flex';
+
+    document.getElementById('oa-'+slot).textContent=p.name.charAt(0).toUpperCase();
+    document.getElementById('oa-'+slot).style.background=p.color;
+    document.getElementById('oa-'+slot).className='opp-av'+(pid===s.turn?' active':'');
+    document.getElementById('on-'+slot).textContent=p.name;
+    document.getElementById('oc-'+slot).textContent=p.handCount+' taş';
+
+    // Fan kartlar — daha iyi görünüm
+    const maxCards=slot==='top'?9:7;
+    const count=Math.min(p.handCount,maxCards);
+    for(let i=0;i<count;i++){
+      const card=document.createElement('div');
+      card.className='opp-card';
+
+      if(slot==='top'){
+        // Üst rakip: dikey portret kartlar, yelpaze şeklinde
+        const a=(i-(count-1)/2)*5;
+        const dy=Math.abs(a)*0.5;
+        card.style.cssText=`transform:perspective(100px) rotateX(8deg) rotate(${a}deg) translateY(${dy}px);transform-origin:bottom center;margin:0 -7px;`;
+      } else {
+        // Sol/Sağ rakip: yatay kartlar, yelpaze
+        const a=(i-(count-1)/2)*4;
+        const dx=Math.abs(a)*0.3;
+        if(slot==='left'){
+          card.style.cssText=`transform:perspective(80px) rotateY(8deg) rotate(${a}deg) translateX(${dx}px);margin:-7px 0;`;
+        } else {
+          card.style.cssText=`transform:perspective(80px) rotateY(-8deg) rotate(${a}deg) translateX(${-dx}px);margin:-7px 0;`;
+        }
+      }
+      zone.insertBefore(card,infoEl);
+    }
+  });
+}
+
+/* ════════════════════════════════════════
+   MAKE DOMINO — şık noktalı taş
+════════════════════════════════════════ */
+function makeDomino(tile,onBoard,playable,selected){
+  const wrap=document.createElement('div');
+  wrap.className='domino';wrap.dataset.id=tile.id;
+  if(playable)  wrap.classList.add('playable');
+  if(selected)  wrap.classList.add('selected');
+  if(!playable&&!onBoard) wrap.classList.add('unplayable');
+
+  const body=document.createElement('div');body.className='tile-body';
+  body.appendChild(makeFace(tile.left,onBoard));
+  body.appendChild(makeFace(tile.right,onBoard));
+  wrap.appendChild(body);return wrap;
+}
+function makeFace(num,onBoard){
+  const face=document.createElement('div');face.className='face';
+  (DOTS[num]||[]).forEach(([x,y])=>{
+    const d=document.createElement('div');d.className='dot';
+    d.style.left=x+'%';d.style.top=y+'%';face.appendChild(d);
+  });
+  return face;
+}
+
+/* ════════════════════════════════════════
+   TOPBAR / BONEYARD / PLAYERS / SCORES
+════════════════════════════════════════ */
+function renderTopbar(s){
+  const p=s.players[s.turn];
+  document.getElementById('tbTurn').textContent=p?(s.turn===myId?'Sen!':p.name):'—';
+  document.getElementById('tbRound').innerHTML=`<i class="fas fa-layer-group"></i> T${s.round}`;
+}
+function renderBoneyard(s){
+  document.getElementById('byCount').textContent=s.boneyardCount;
+  document.getElementById('boneyardBtn').disabled=!(s.started&&s.turn===myId&&s.boneyardCount>0);
+}
+function renderPlayers(s){
+  const c=document.getElementById('playersCnt');c.innerHTML='';
+  (s.order||[]).forEach(pid=>{
+    const p=s.players[pid];if(!p)return;
+    const row=document.createElement('div');
+    row.className='p-row'+(pid===s.turn?' active':'')+(pid===myId?' me':'');
+    row.innerHTML=`<div class="p-av" style="background:${p.color}">${p.name.charAt(0).toUpperCase()}</div>
+      <div class="p-info"><div class="p-name">${p.name}${pid===myId?'<span style="color:#5dade2;font-size:.6rem"> (Sen)</span>':''}</div>
+      <div class="p-sub">Skor: ${s.scores[pid]||0}</div></div>
+      ${pid===s.turn?'<i class="fas fa-crown" style="color:var(--gold);font-size:.8rem"></i>':''}
+      <div class="p-pill"><i class="fas fa-layer-group"></i> ${p.handCount}</div>`;
+    c.appendChild(row);
+  });
+}
+function renderScores(s){
+  const c=document.getElementById('scoresCnt');c.innerHTML='';
+  Object.entries(s.scores).sort((a,b)=>b[1]-a[1]).forEach(([pid,sc],i)=>{
+    const p=s.players[pid];if(!p)return;
+    const row=document.createElement('div');row.className='sc-row';
+    row.innerHTML=`<div class="sc-rank">${i+1}</div><div class="sc-name">${p.name}</div><div class="sc-val">${sc}</div>`;
+    c.appendChild(row);
+  });
+}
+
+/* ════════════════════════════════════════
+   CHAT
+════════════════════════════════════════ */
+function appendChat(d){
+  const c=document.getElementById('chatMsgs');
+  const el=document.createElement('div');el.className='cm';
+  if(d.system){el.classList.add('sys');el.innerHTML=`<span class="sys-t"><i class="fas fa-circle-info"></i> ${d.msg}</span>`;}
+  else{const me=d.senderId===myId;if(me)el.classList.add('mine');
+    el.innerHTML=`<div class="cm-av" style="background:${d.color}">${d.name.charAt(0).toUpperCase()}</div>
+      <div class="cm-bub">${!me?`<div class="cm-name" style="color:${d.color}">${d.name}</div>`:''}${d.msg}</div>`;}
+  c.appendChild(el);if(chatOpen)c.scrollTop=c.scrollHeight;
+}
+function sendChat(){
+  const i=document.getElementById('chatInp');const msg=i.value.trim();
+  if(!msg)return;socket.emit('chat',{msg});i.value='';
+}
+function openChat(){
+  openOv('chatOv');chatOpen=true;unread=0;updChatBadge();
+  setTimeout(()=>{const m=document.getElementById('chatMsgs');m.scrollTop=m.scrollHeight;},80);
+}
+function updChatBadge(){
+  const btn=document.getElementById('chatBtn');let b=btn.querySelector('.cbadge');
+  if(unread>0){if(!b){b=document.createElement('div');b.className='cbadge';btn.appendChild(b);}b.textContent=unread>9?'9+':unread;}
+  else if(b)b.remove();
+}
+
+/* ════════════════════════════════════════
+   OVERLAYS
+════════════════════════════════════════ */
+function openOv(id){document.getElementById(id).classList.add('show');}
+function closeOv(id){document.getElementById(id).classList.remove('show');if(id==='chatOv')chatOpen=false;}
+
+/* ════════════════════════════════════════
+   WIN
+════════════════════════════════════════ */
+function showWin(winner,winnerName,scores){
+  document.getElementById('winBox').classList.add('show');
+  document.getElementById('winMsg').textContent=winner===myId?'🎉 Kazandınız!':winnerName+' kazandı!';
+  const sc=document.getElementById('winScores');sc.innerHTML='';
+  if(roomState){
+    Object.entries(scores).forEach(([pid,s])=>{
+      const p=roomState.players[pid];if(!p)return;
+      const r=document.createElement('div');r.className='wr';
+      r.innerHTML=`<span>${p.name}${pid===myId?' (Sen)':''}</span><span class="v">${s}</span>`;sc.appendChild(r);
+    });
+  }
+}
+
+/* ════════════════════════════════════════
+   EFFECTS
+════════════════════════════════════════ */
+function notify(msg,type=''){
+  const s=document.getElementById('notifs');
+  const el=document.createElement('div');el.className=`ntf ${type}`;el.innerHTML=msg;
+  s.appendChild(el);setTimeout(()=>el.remove(),3000);
+}
+function spawnImpact(x,y){
+  const r=document.createElement('div');r.className='impact-ring';r.style.left=x+'px';r.style.top=y+'px';
+  document.body.appendChild(r);setTimeout(()=>r.remove(),560);
+  const d=document.createElement('div');d.className='dust';d.style.left=x+'px';d.style.top=(y+12)+'px';
+  document.body.appendChild(d);setTimeout(()=>d.remove(),560);
+}
+function spawnEmoji(emoji,name,color){
+  // Spread emojis more dynamically
+  const x=15+Math.random()*70, y=20+Math.random()*50;
+  const el=document.createElement('div');el.className='emj-float';el.textContent=emoji;
+  el.style.left=x+'vw';el.style.top=y+'vh';document.body.appendChild(el);
+  const tag=document.createElement('div');tag.className='emj-tag';tag.textContent=name;
+  tag.style.left=x+'vw';tag.style.top=(y+6)+'vh';tag.style.color=color;document.body.appendChild(tag);
+  setTimeout(()=>{el.remove();tag.remove();},2700);
+}
+function spawnConfetti(){
+  const cols=['#d4a843','#e74c3c','#3498db','#2ecc71','#f1c40f','#9b59b6','#1abc9c'];
+  for(let i=0;i<90;i++){
+    const el=document.createElement('div');el.className='cf';
+    el.style.left=Math.random()*100+'vw';
+    el.style.background=cols[Math.floor(Math.random()*cols.length)];
+    el.style.animationDuration=(1.7+Math.random()*2.5)+'s';
+    el.style.animationDelay=(Math.random()*.85)+'s';
+    el.style.borderRadius=Math.random()>.5?'50%':'2px';
+    document.body.appendChild(el);setTimeout(()=>el.remove(),5500);
+  }
+}
+
+/* ════════════════════════════════════════
+   CLOSE PANELS ON OUTSIDE CLICK
+════════════════════════════════════════ */
+document.addEventListener('click',e=>{
+  if(!e.target.closest('#emojiBar')&&!e.target.closest('#emojiBtn')){
+    document.getElementById('emojiBar').classList.remove('show');emojiOpen=false;
+  }
+  if(!e.target.closest('#musicPanel')&&!e.target.closest('#musicBtn')){
+    document.getElementById('musicPanel').classList.remove('show');musicOpen=false;
+  }
+});
+document.addEventListener('keydown',e=>{
+  if(e.key==='Enter'){
+    if(document.activeElement.id==='chatInp')sendChat();
+    if(document.activeElement.id==='nameInp'||document.activeElement.id==='roomInp')doJoin();
+  }
+  if(e.key==='Escape'){
+    ['sideOv','playersOv','chatOv'].forEach(closeOv);
+    toggleEmoji(true);toggleMusic(true);
+    selectedId=pendingId=null;renderHand();
+  }
+});
+
+// Init
+buildEmojiBar();
+</script>
+</body>
+</html>
